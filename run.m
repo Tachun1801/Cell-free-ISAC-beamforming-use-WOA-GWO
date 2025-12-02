@@ -1,5 +1,5 @@
-cvx_path = 'F:\CVX\cvx-w64\cvx'; % Path of the CVX installation
-addpath(genpath(cvx_path)); % Add CVX to the path
+% Cell-Free ISAC Beamforming using WOA-GWO Hybrid Optimizer
+% No CVX required - uses metaheuristic optimization (WOA-GWO)
 addpath(genpath('./')); % Add paths of subfolders
 
 
