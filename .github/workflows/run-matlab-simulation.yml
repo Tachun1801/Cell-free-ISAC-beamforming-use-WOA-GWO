@@ -1,0 +1,58 @@
+name: Run MATLAB Simulation
+
+on:
+  workflow_dispatch:  # Manual trigger
+  push:
+    branches: [ main ]
+    paths:
+      - '**.m'
+  # schedule:
+  #   - cron: '0 0 * * 1'  # Weekly on Monday at midnight UTC
+
+jobs:
+  run-simulation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # Set timeout for long-running simulations
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2023b
+      
+      - name: Create output directory
+        run: mkdir -p output
+      
+      - name: Run MATLAB simulation
+        uses: matlab-actions/run-command@v2
+        with:
+          command: run
+      
+      - name: Upload simulation results
+        uses: actions/upload-artifact@v4
+        if: always()  # Upload artifacts even if simulation fails
+        with:
+          name: simulation-results-${{ github.run_number }}-${{ github.run_attempt }}
+          path: output/
+          retention-days: 30
+          if-no-files-found: warn
+      
+      # Optional: Commit results back to repository
+      # Uncomment the following steps to enable automatic commits of results
+      # - name: Configure Git
+      #   run: |
+      #     git config --local user.email "github-actions[bot]@users.noreply.github.com"
+      #     git config --local user.name "github-actions[bot]"
+      #
+      # - name: Commit and push results
+      #   run: |
+      #     git add output/
+      #     git diff --staged --quiet || git commit -m "Update simulation results [skip ci]"
+      #     git push
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
