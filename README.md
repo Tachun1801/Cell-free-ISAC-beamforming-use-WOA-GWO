@@ -47,11 +47,14 @@ The hybrid approach combines the strengths of both algorithms:
 
 The optimization parameters can be configured in `sim_params.m`:
 ```matlab
-params.woa_gwo.n_whales = 30;    % Number of whales/agents
-params.woa_gwo.n_wolves = 20;    % Number of wolves
-params.woa_gwo.max_iter = 100;   % Maximum iterations
-params.woa_gwo.lb = -10;         % Lower bound
-params.woa_gwo.ub = 10;          % Upper bound
+params.woa_gwo.n_whales = 30;              % Number of whales/agents
+params.woa_gwo.n_wolves = 20;              % Number of wolves
+params.woa_gwo.max_iter = 100;             % Maximum iterations
+params.woa_gwo.lb = -10;                   % Lower bound
+params.woa_gwo.ub = 10;                    % Upper bound
+params.woa_gwo.sensing_weight = 0.01;      % Weight for sensing SNR in fitness
+params.woa_gwo.penalty_factor = 100;       % Penalty for constraint violations
+params.woa_gwo.feasibility_tolerance = 0.9; % Tolerance for feasibility check
 ```
 
 ### Project Structure

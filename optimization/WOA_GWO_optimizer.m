@@ -28,6 +28,8 @@ function [F_star, min_SINR, sensing_SNR] = WOA_GWO_optimizer(H_comm, sigmasq_ue,
     max_iter = params.woa_gwo.max_iter;
     lb = params.woa_gwo.lb;
     ub = params.woa_gwo.ub;
+    sensing_weight = params.woa_gwo.sensing_weight;
+    penalty_factor = params.woa_gwo.penalty_factor;
     
     % Initialize population
     population = lb + (ub - lb) * rand(n_agents, dim);
@@ -37,7 +39,7 @@ function [F_star, min_SINR, sensing_SNR] = WOA_GWO_optimizer(H_comm, sigmasq_ue,
     for i = 1:n_agents
         F_test = decode_solution(population(i, :), U, M, N);
         F_test = normalize_power(F_test, P_comm, M);
-        fitness(i) = compute_fitness(H_comm, F_test, F_sensing, sigmasq_ue, sensing_beamsteering, sigmasq_radar_rcs);
+        fitness(i) = compute_fitness(H_comm, F_test, F_sensing, sigmasq_ue, sensing_beamsteering, sigmasq_radar_rcs, sensing_weight, penalty_factor);
     end
     
     % Find best solution
@@ -73,7 +75,7 @@ function [F_star, min_SINR, sensing_SNR] = WOA_GWO_optimizer(H_comm, sigmasq_ue,
             % Evaluate fitness
             F_test = decode_solution(population(i, :), U, M, N);
             F_test = normalize_power(F_test, P_comm, M);
-            fitness(i) = compute_fitness(H_comm, F_test, F_sensing, sigmasq_ue, sensing_beamsteering, sigmasq_radar_rcs);
+            fitness(i) = compute_fitness(H_comm, F_test, F_sensing, sigmasq_ue, sensing_beamsteering, sigmasq_radar_rcs, sensing_weight, penalty_factor);
         end
         
         % Update best solution (for WOA)
@@ -144,8 +146,8 @@ function new_pos = WOA_update(pos, best_pos, a, a2, dim, lb, ub, population, n_a
         end
     else
         % Spiral updating position
-        D_prime = abs(best_pos - pos); % Eq. (2.5)
-        new_pos = D_prime .* exp(b * l) .* cos(2 * pi * l) + best_pos; % Eq. (2.5)
+        D_prime = abs(best_pos - pos); % Distance calculation
+        new_pos = D_prime .* exp(b * l) .* cos(2 * pi * l) + best_pos; % Spiral position update (Eq. 2.5)
     end
     
     % Boundary check
@@ -213,7 +215,7 @@ function F_norm = normalize_power(F, P_max, M)
 end
 
 %% Fitness Function: Maximize minimum SINR with sensing consideration
-function fitness = compute_fitness(H_comm, F_comm, F_sensing, sigmasq_ue, sensing_beamsteering, sigmasq_radar_rcs)
+function fitness = compute_fitness(H_comm, F_comm, F_sensing, sigmasq_ue, sensing_beamsteering, sigmasq_radar_rcs, sensing_weight, penalty_factor)
     % Compute SINR for all users
     SINR = compute_SINR(H_comm, F_comm, F_sensing, sigmasq_ue);
     min_SINR = min(SINR);
@@ -223,11 +225,11 @@ function fitness = compute_fitness(H_comm, F_comm, F_sensing, sigmasq_ue, sensin
     
     % Fitness is the minimum SINR (we maximize this)
     % Add a small term for sensing to encourage good sensing performance
-    fitness = min_SINR + 0.01 * SSNR;
+    fitness = min_SINR + sensing_weight * SSNR;
     
     % Penalize negative or very low SINR
     if min_SINR < 0
-        fitness = fitness - 100;
+        fitness = fitness - penalty_factor;
     end
 end
 
@@ -260,6 +262,7 @@ function [F_comm, F_sensing_opt, SSNR_opt, feasible] = WOA_GWO_JSC_optimizer(H_c
     max_iter = params.woa_gwo.max_iter;
     lb = params.woa_gwo.lb;
     ub = params.woa_gwo.ub;
+    penalty_factor = params.woa_gwo.penalty_factor;
     
     % Initialize population
     population = lb + (ub - lb) * rand(n_agents, dim);
@@ -269,7 +272,7 @@ function [F_comm, F_sensing_opt, SSNR_opt, feasible] = WOA_GWO_JSC_optimizer(H_c
     for i = 1:n_agents
         [F_all_test, ~, ~] = decode_jsc_solution(population(i, :), U, M, N, sens_streams);
         F_all_test = normalize_power_jsc(F_all_test, P_all, M, num_streams);
-        fitness(i) = compute_jsc_fitness(H_comm, F_all_test, U, sens_streams, sigmasq_ue, sensing_beamsteering, sigmasq_radar_rcs, gamma_min);
+        fitness(i) = compute_jsc_fitness(H_comm, F_all_test, U, sens_streams, sigmasq_ue, sensing_beamsteering, sigmasq_radar_rcs, gamma_min, penalty_factor);
     end
     
     % Find best solution
@@ -303,7 +306,7 @@ function [F_comm, F_sensing_opt, SSNR_opt, feasible] = WOA_GWO_JSC_optimizer(H_c
             % Evaluate fitness
             [F_all_test, ~, ~] = decode_jsc_solution(population(i, :), U, M, N, sens_streams);
             F_all_test = normalize_power_jsc(F_all_test, P_all, M, num_streams);
-            fitness(i) = compute_jsc_fitness(H_comm, F_all_test, U, sens_streams, sigmasq_ue, sensing_beamsteering, sigmasq_radar_rcs, gamma_min);
+            fitness(i) = compute_jsc_fitness(H_comm, F_all_test, U, sens_streams, sigmasq_ue, sensing_beamsteering, sigmasq_radar_rcs, gamma_min, penalty_factor);
         end
         
         % Update best solution
@@ -354,8 +357,9 @@ function [F_comm, F_sensing_opt, SSNR_opt, feasible] = WOA_GWO_JSC_optimizer(H_c
     min_SINR = min(SINR);
     SSNR_opt = compute_sensing_SNR(sigmasq_radar_rcs, sensing_beamsteering, F_comm, F_sensing_opt);
     
-    % Check feasibility
-    feasible = (min_SINR >= gamma_min * 0.9); % Allow 10% tolerance
+    % Check feasibility using configurable tolerance
+    feasibility_tolerance = params.woa_gwo.feasibility_tolerance;
+    feasible = (min_SINR >= gamma_min * feasibility_tolerance);
 end
 
 %% Decode JSC Solution
@@ -390,7 +394,7 @@ function F_norm = normalize_power_jsc(F, P_max, M, num_streams)
 end
 
 %% JSC Fitness Function
-function fitness = compute_jsc_fitness(H_comm, F_all, U, sens_streams, sigmasq_ue, sensing_beamsteering, sigmasq_radar_rcs, gamma_min)
+function fitness = compute_jsc_fitness(H_comm, F_all, U, sens_streams, sigmasq_ue, sensing_beamsteering, sigmasq_radar_rcs, gamma_min, penalty_factor)
     F_comm = F_all(1:U, :, :);
     if sens_streams > 0
         F_sensing = F_all(U+1:end, :, :);
@@ -407,7 +411,7 @@ function fitness = compute_jsc_fitness(H_comm, F_all, U, sens_streams, sigmasq_u
     
     % Penalize if minimum SINR constraint is violated
     if min_SINR < gamma_min
-        penalty = 100 * (gamma_min - min_SINR);
+        penalty = penalty_factor * (gamma_min - min_SINR);
     else
         penalty = 0;
     end
