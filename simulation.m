@@ -47,27 +47,29 @@ function results = simulation(params, output_filename)
             results{rep}.power{p_i}{solution_counter}.name = 'NS+RZF';
             solution_counter = solution_counter + 1;
     
-            %% NS Sensing - WOA-GWO Optimized Comm
-            [F_star_WOA_GWO_NS, SINR_min_WOA_GWO_NS, ~] = WOA_GWO_optimizer(H_comm, params.sigmasq_ue, P_comm, F_sensing_NS, sensing_beamsteering, params.sigmasq_radar_rcs, params);
+            %% NS Sensing - WOA-GWO Opt Comm
+            wrapped_objective = @(gamma) opt_comm_WOA_GWO(H_comm, params.sigmasq_ue, P_comm, F_sensing_NS, gamma);
+            [F_star_WOA_GWO_NS, SINR_min_WOA_GWO_NS] = bisection_SINR_WOA_GWO(params.bisect.low, params.bisect.high, params.bisect.tol, wrapped_objective);
             results{rep}.power{p_i}{solution_counter} = compute_metrics(H_comm, F_star_WOA_GWO_NS, params.sigmasq_ue, sensing_beamsteering, F_sensing_NS, params.sigmasq_radar_rcs);
-            results{rep}.power{p_i}{solution_counter}.name = 'NS+OPT';
+            results{rep}.power{p_i}{solution_counter}.name = 'NS+WOA-GWO';
             results{rep}.power{p_i}{solution_counter}.min_SINR_opt = SINR_min_WOA_GWO_NS;
             solution_counter = solution_counter + 1;
-            
-            %% CB Sensing - WOA-GWO Optimized Comm
-            [F_star_WOA_GWO_CB, SINR_min_WOA_GWO_CB, ~] = WOA_GWO_optimizer(H_comm, params.sigmasq_ue, P_comm, F_sensing_CB, sensing_beamsteering, params.sigmasq_radar_rcs, params);
+
+            %% CB Sensing - WOA-GWO Opt Comm
+            wrapped_objective = @(gamma) opt_comm_WOA_GWO(H_comm, params.sigmasq_ue, P_comm, F_sensing_CB, gamma);
+            [F_star_WOA_GWO_CB, SINR_min_WOA_GWO_CB] = bisection_SINR_WOA_GWO(params.bisect.low, params.bisect.high, params.bisect.tol, wrapped_objective);
             results{rep}.power{p_i}{solution_counter} = compute_metrics(H_comm, F_star_WOA_GWO_CB, params.sigmasq_ue, sensing_beamsteering, F_sensing_CB, params.sigmasq_radar_rcs);
-            results{rep}.power{p_i}{solution_counter}.name = 'CB+OPT';
+            results{rep}.power{p_i}{solution_counter}.name = 'CB+WOA-GWO';
             results{rep}.power{p_i}{solution_counter}.min_SINR_opt = SINR_min_WOA_GWO_CB;
             solution_counter = solution_counter + 1;
 
-            %% JSC - WOA-GWO Joint Sensing-Communication Optimization
+            %% JSC - WOA-GWO
             sens_streams = 1;
-            [F_jsc_comm, F_jsc_sensing, F_jsc_SSNR, feasible] = WOA_GWO_JSC_optimizer(H_comm, params.sigmasq_ue, SINR_min_WOA_GWO_NS, sensing_beamsteering, sens_streams, params.sigmasq_radar_rcs, params.P, params);
+            [F_jsc_comm, F_jsc_sensing, feasible, F_jsc_SSNR] = opt_jsc_WOA_GWO(H_comm, params.sigmasq_ue, SINR_min_WOA_GWO_NS, sensing_beamsteering, sens_streams, params.sigmasq_radar_rcs, params.P);
 
             results{rep}.power{p_i}{solution_counter} = compute_metrics(H_comm, F_jsc_comm, params.sigmasq_ue, sensing_beamsteering, F_jsc_sensing, params.sigmasq_radar_rcs);
             results{rep}.power{p_i}{solution_counter}.feasible = feasible;
-            results{rep}.power{p_i}{solution_counter}.name = strcat('JSC+Q',num2str(sens_streams));
+            results{rep}.power{p_i}{solution_counter}.name = strcat('JSC+WOA-GWO+Q',num2str(sens_streams));
             results{rep}.power{p_i}{solution_counter}.SSNR_opt = F_jsc_SSNR;
             solution_counter = solution_counter + 1;
         end

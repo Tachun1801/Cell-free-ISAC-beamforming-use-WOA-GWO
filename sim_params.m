@@ -17,6 +17,11 @@ params.woa_gwo.sensing_weight = 0.01; % Weight for sensing SNR in fitness functi
 params.woa_gwo.penalty_factor = 100; % Penalty factor for constraint violations
 params.woa_gwo.feasibility_tolerance = 0.9; % Tolerance factor for feasibility check
 
+% Bisection search parameters for SINR optimization
+params.bisect.low = 0.01;    % Lower bound for SINR search
+params.bisect.high = 100;    % Upper bound for SINR search
+params.bisect.tol = 0.01;    % Tolerance for bisection convergence
+
 % Noise
 params.sigmasq_ue = 1; % UE receiver noise
 params.sigmasq_radar_rcs = 0.1; % Radar RCS variable 
