@@ -1,4 +1,4 @@
-%% Simulation
+%% Simulation using WOA-GWO Hybrid Optimizer
 function results = simulation(params, output_filename)
 
     save_filename = output_filename;
@@ -19,10 +19,6 @@ function results = simulation(params, output_filename)
     
         % Channel generation
         H_comm = LOS_channel(AP_pos, UE_pos, params.N_t);
-        % H_sensing = radar_LOS_channel(target_pos, AP_pos, AP_pos, N_t, N_t, params.sigmasq_radar_rcs);
-            
-        % results{rep}.H_comm = H_comm;
-        % results{rep}.H_sensing = H_sensing;
         
         %% Compute sensing beams
         [sensing_angle, ~] = compute_angle_dist(AP_pos, target_pos);
@@ -45,34 +41,29 @@ function results = simulation(params, output_filename)
             
             solution_counter = 1;
     
-    
-            
-            %% NS Sensing - RZF Comm
+            %% NS Sensing - RZF Comm (Baseline)
             F_star_RZF = beam_regularized_zeroforcing(H_comm, P_comm, params.sigmasq_ue)*sqrt(P_comm);
             results{rep}.power{p_i}{solution_counter} = compute_metrics(H_comm, F_star_RZF, params.sigmasq_ue, sensing_beamsteering, F_sensing_NS, params.sigmasq_radar_rcs);
             results{rep}.power{p_i}{solution_counter}.name = 'NS+RZF';
             solution_counter = solution_counter + 1;
     
-            %% NS Sensing - Opt Comm
-            wrapped_objective = @(gamma) opt_comm_SOCP_vec(H_comm, params.sigmasq_ue, P_comm, F_sensing_NS, gamma);
-            [F_star_SOCP_NS, SINR_min_SOCP_NS] = bisection_SINR(params.bisect.low, params.bisect.high, params.bisect.tol, wrapped_objective);
-            results{rep}.power{p_i}{solution_counter} = compute_metrics(H_comm, F_star_SOCP_NS, params.sigmasq_ue, sensing_beamsteering, F_sensing_NS, params.sigmasq_radar_rcs);
+            %% NS Sensing - WOA-GWO Optimized Comm
+            [F_star_WOA_GWO_NS, SINR_min_WOA_GWO_NS, ~] = WOA_GWO_optimizer(H_comm, params.sigmasq_ue, P_comm, F_sensing_NS, sensing_beamsteering, params.sigmasq_radar_rcs, params);
+            results{rep}.power{p_i}{solution_counter} = compute_metrics(H_comm, F_star_WOA_GWO_NS, params.sigmasq_ue, sensing_beamsteering, F_sensing_NS, params.sigmasq_radar_rcs);
             results{rep}.power{p_i}{solution_counter}.name = 'NS+OPT';
-            results{rep}.power{p_i}{solution_counter}.min_SINR_opt = SINR_min_SOCP_NS;
+            results{rep}.power{p_i}{solution_counter}.min_SINR_opt = SINR_min_WOA_GWO_NS;
             solution_counter = solution_counter + 1;
             
-            %% CB Sensing - OPT Comm
-            wrapped_objective = @(gamma) opt_comm_SOCP_vec(H_comm, params.sigmasq_ue, P_comm, F_sensing_CB, gamma);
-            [F_star_SOCP_CB, SINR_min_SOCP_CB] = bisection_SINR(params.bisect.low, params.bisect.high, params.bisect.tol, wrapped_objective);
-            results{rep}.power{p_i}{solution_counter} = compute_metrics(H_comm, F_star_SOCP_CB, params.sigmasq_ue, sensing_beamsteering, F_sensing_CB, params.sigmasq_radar_rcs);
+            %% CB Sensing - WOA-GWO Optimized Comm
+            [F_star_WOA_GWO_CB, SINR_min_WOA_GWO_CB, ~] = WOA_GWO_optimizer(H_comm, params.sigmasq_ue, P_comm, F_sensing_CB, sensing_beamsteering, params.sigmasq_radar_rcs, params);
+            results{rep}.power{p_i}{solution_counter} = compute_metrics(H_comm, F_star_WOA_GWO_CB, params.sigmasq_ue, sensing_beamsteering, F_sensing_CB, params.sigmasq_radar_rcs);
             results{rep}.power{p_i}{solution_counter}.name = 'CB+OPT';
-            results{rep}.power{p_i}{solution_counter}.min_SINR_opt = SINR_min_SOCP_CB;
+            results{rep}.power{p_i}{solution_counter}.min_SINR_opt = SINR_min_WOA_GWO_CB;
             solution_counter = solution_counter + 1;
 
-            %% JSC
+            %% JSC - WOA-GWO Joint Sensing-Communication Optimization
             sens_streams = 1;
-            [Q_jsc, feasible, F_jsc_SSNR] = opt_jsc_SDP(H_comm, params.sigmasq_ue, SINR_min_SOCP_NS, sensing_beamsteering, sens_streams, params.sigmasq_radar_rcs, params.P);
-            [F_jsc_comm, F_jsc_sensing] = SDP_beam_extraction(Q_jsc, H_comm);
+            [F_jsc_comm, F_jsc_sensing, F_jsc_SSNR, feasible] = WOA_GWO_JSC_optimizer(H_comm, params.sigmasq_ue, SINR_min_WOA_GWO_NS, sensing_beamsteering, sens_streams, params.sigmasq_radar_rcs, params.P, params);
 
             results{rep}.power{p_i}{solution_counter} = compute_metrics(H_comm, F_jsc_comm, params.sigmasq_ue, sensing_beamsteering, F_jsc_sensing, params.sigmasq_radar_rcs);
             results{rep}.power{p_i}{solution_counter}.feasible = feasible;
@@ -84,7 +75,7 @@ function results = simulation(params, output_filename)
     
     %% Save Results
     output_folder = './output/';
-    if ~exist(output_folder)
+    if ~exist(output_folder, 'dir')
         mkdir(output_folder);
     end
     save(strcat(output_folder, save_filename, '.mat'));
