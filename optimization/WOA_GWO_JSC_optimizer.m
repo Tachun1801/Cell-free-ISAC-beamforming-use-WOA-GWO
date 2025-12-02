@@ -11,11 +11,11 @@ function [F_comm, F_sensing_opt, SSNR_opt, feasible] = WOA_GWO_JSC_optimizer(H_c
     % Inputs:
     %   H_comm - Communication channel matrix (U x M x N)
     %   sigmasq_ue - UE receiver noise variance
-    %   gamma_min - Minimum SINR threshold (SINR_min)
+    %   gamma_min - Minimum SINR threshold
     %   sensing_beamsteering - Sensing beamsteering vectors
     %   sens_streams - Number of sensing streams
     %   sigmasq_radar_rcs - Radar RCS variance
-    %   P_all - Total power budget per AP (P_total)
+    %   P_all - Total power budget per AP
     %   params - Structure containing WOA-GWO parameters
     %
     % Outputs:
@@ -162,7 +162,7 @@ function new_pos = WOA_update(pos, best_pos, a, a2, dim, lb, ub, population, n_a
     else
         % Spiral updating position
         D_prime = abs(best_pos - pos); % Distance calculation
-        new_pos = D_prime .* exp(b * l) .* cos(2 * pi * l) + best_pos; % Spiral position update (Eq. 2.5)
+        new_pos = D_prime .* exp(b * l) .* cos(2 * pi * l) + best_pos; % Spiral position update (Eq. 2.6)
     end
     
     % Boundary check
